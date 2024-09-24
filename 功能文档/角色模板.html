@@ -130,7 +130,84 @@
 	<p>在EventConstruct时，对进度条的进度进行SetPersent。Persent值为传入的当前值/最大值，来初始化进度条的百分比。</p>
 	<p>然后GetComponentByClass来获取拥有者的AC-角色属性和AC角色状态，</p>
 	<p>通过Bind Event to 触发伤害时，来实现Actor组件和使用的Actor之间的通信。（是靠事件分发器实现的）这样，每次调用“触发伤害时”事件时，让血条来更新。</p>
-	<img src="角色模板/英雄血条（弃用）.png">
+
+	<h2>设置角色朝向</h2>
+	<p>首先角色有个“将旋转朝向运动”，勾选。</p>
+	<p>然后我们实现一个功能，使用手柄右摇杆或上下左右键实现角色朝向设置</p>
+	<p>而且在运动期间可以设置角色朝向。</p>
+	<p>在函数库中创建函数，命名为“设置角色朝向SetActorOrientation”。设置角色朝向的核心就是SetActorRotation，所以有两个参数：设置旋转的目标和Orientation</p>
+	<img src="角色模板/设置角色朝向1.png">
+	<h3>上帝视角wasd输入模式</h3>
+	<p>功能实现后，给上帝视角wasd控制方式加上“IA-旋转朝向”的输入操作，将值类型设置为Vector2D。然后编辑上帝视角wasd的输入映射情境</p>
+	<p>有必要陈述一下：</p>
+	<p>我们给IA-上帝视角wasd旋转朝向设置为Vector2D，在IMC中添加的时候有一点需要注意：</p>
+	<p>键盘上的方向键和手柄上的右摇杆，</p>
+	<p>左右是ActionValueY的输出值，右为1，左为-1。这里键盘和手柄一致</p>
+	<p>上下则不同。作为ActionValueX的输出值，对于键盘来说，上为1，下为-1；手柄则相反，上为-1，下为1。所以我们设置角色旋转按键时，在设置游戏手柄右摇杆Y轴时添加一个否定的修改器。</p>
+	
+	<p>同时谨记区分，游戏手柄Y轴输出的是ActionValueX，X轴输出的是ActionValueY。</p>
+	<p>（这里做说明，向上键不加修改器，向下键加一个否定，向右键加一个拌和输入轴值，向左加一个否定加一个拌和，手柄Y轴加一个否定，手柄X轴加一个拌和输入。）</p>
+
+	<p>（所以手柄Y轴输出的是ActionValueX。如果向右不加修改器，向上加拌和输入轴值，那么手柄Y轴输出的就是ActionValueY）</p>
+	<p>（同时区分手柄右摇杆和左摇杆的Y轴输出。他们是相反的。）</p>
+	<p>然后就可以使用功能。</p>
+	<img src="角色模板/设置角色朝向2.png">
+	<p>完全可以在运动期间可以设置角色朝向。</p>
+	<h3>第三人称输入模式</h3>
+	<p>接下来实现TPS的视角朝向</p>
+	<p>TPS因为操作的特性：</p>
+	<p>角色移动是根据摄像机方向进行移动的，并不是根据角色方向</p>
+	<p>而且TPS并不需要旋转摄像机（移动手柄）的时候就设置朝向</p>
+	<p>在TPS输入模式下创建IA-TPS转动摄像机，值类型为Vector2D</p>
+	<p>IMC中设置IA的按键绑定，</p>
+	<p>选择“鼠标X、Y”，修改器选择盲区</p>
+	<p>选择“游戏鼠标右摇杆X、Y轴”</p>
+	<p>无论鼠标还是手柄，Y轴没有修改器，X轴为拌和输入轴值，进行实验</p>
+	<p>鼠标往上，ActionValueX=1，鼠标往下，ActionValueX=-1，</p>
+	<p>鼠标往左，ActionValueY=-1，鼠标往右，ActionValueY=1，</p>
+	<p>手柄往上，ActionValueX=-1，手柄往下，ActionValueX=1，</p>
+	<p>手柄往左，ActionValueY=-1，手柄往右，ActionValueY=1，</p>
+	<p>所以要给右摇杆的Y轴加一个否定的修改器</p>
+	<p>我们要通过鼠标对弹簧臂进行SetWorldRotation。我们不能直接将ActionValue的值赋给SetWorldRotation。因为手柄摇杆回归中心、鼠标从运动到停止的时候，ActionValue的值会变小，也就是会把我们动摇杆期间的赋值又给回去。</p>
+	<p>（弹簧臂不要勾选继承yaw）</p>
+	<p>所以我们要把鼠标（右摇杆）的输出值和弹簧臂的GetWorldRotation进行一次累加，并将累加值赋值给SetWorldRotation。</p>
+	<p>摄像机的WorldRotation是Yaw范围在（-180，180），pitch是（-90，90）内的可能值。所以在累加的时候，pitch有可能会超出90这个范围。所以要对Pitch的值取一个小于某个数的值。</p>
+	<img src="角色模板/设置角色朝向3.png">
+	<p>成功实现。</p>
+	<p>接下来重写移动逻辑。原来的移动逻辑就是将wasd的ActionValue进行角色的世界Movement Input。也就是说，现在的移动逻辑，即使你面朝任意一个地方，进行前向移动时都是向着世界的X轴前进。</p>
+	<p>现在我们要根据摄像机的WorldRotation对角色的移动方向进行设置。</p>
+	<p>有个严重问题：虽然摄像机看到的世界方向是不变的，但是当Actor转动的时候弹簧臂的GetWorldRotation的yaw值是变的</p>
+	<p>但是经过相减之后，就得到了我们希望的不变的摄像机WorldRotation</p>
+	<img src="角色模板/设置角色朝向4.png">
+	<p>我们可以将这个值进行SetActorRotation试验一下</p>
+	<img src="角色模板/设置角色朝向5.png">
+	<p>我们后面并不会这么用移动。因为第三人称转动摄像机时并不应该SetActorRotation。这里只是一次试验</p>
+	<p>问题的关键是摄像机的GetWorldRotation是随着Actor的角度而改变的。我们为了获得真正的不变的GetWorldRotation，应该用WorldRotation - ActorRotation。这样得到的就是不变的WorldRotation。</p>
+	<p>我们可以将它写成一个函数，命名为“第三人称相机不变世界旋转 Third Person Camera Truth World Rotation”</p>
+	<img src="角色模板/设置角色朝向6.png">
+	<p>然后使用该函数，得到相机的真实世界旋转。</p>
+	<img src="角色模板/设置角色朝向7.png">
+	<p>我们也可以修改下函数，让这个函数可以更具有普遍性。</p>
+	<img src="角色模板/设置角色朝向8.png">
+	<img src="角色模板/设置角色朝向9.png">
+	<p>后续的东西，特别是技能的释放等，默认方向为角色朝向（第三人称呢？），主动方向应当SetActorOrientation。一般来说，第三人称下，在移动的时候就通过“将旋转朝向运动”进行角色转向了。</p>
+	<p>当第三人称下释放技能时，如果需要向相机的方向或其他组件的方向释放技能，则依然需要组件真实世界旋转ComponentTruthWorldRotation函数来SetActorOrientation。所以这种情况下，角色技能的释放方向依然是角色的朝向。p>
+	<p></p>
+	<p></p>
+	<p></p>
+	<p></p>
+	<p></p>
+	<p></p>
+	<p></p>
+	<p></p>
+	<p></p>
+	<p></p>
+	<p></p>
+	<p></p>
+	<p></p>
+	<p></p>
+	<p></p>
+	<p></p>
 	<p></p>
 	<p></p>
 	<p></p>
